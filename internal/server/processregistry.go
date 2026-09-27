@@ -12,13 +12,15 @@ func (s Session) PID() int { return s.pid }
 type ProcessState uint8
 
 const (
-	// Starting has a process but no foreground window yet.
+	// Starting has a process but no visible window yet.
 	Starting ProcessState = iota
 	Active
-	// Cached retains a background process so a later launch can resume it.
+	// Cached retains a process with no visible window so a later launch can resume it.
 	Cached
 	// Evicted retains only the lifecycle record; its process and windows are gone.
 	Evicted
+	Unresponsive
+	Crashed
 )
 
 // Process is the server-side record for an application execution.
@@ -64,22 +66,36 @@ func (r *ProcessRegistry) Unregister(pid int) {
 	delete(r.processes, pid)
 }
 
-// Activate makes one live process active and caches every other process.
+// Activate marks a live process as having a visible window. More than one
+// process may be active while their windows share a display.
 func (r *ProcessRegistry) Activate(pid int) bool {
 	process, ok := r.processes[pid]
-	if !ok || process.State == Evicted {
+	if !ok || process.State == Evicted || process.State == Crashed {
 		return false
 	}
-	for id, process := range r.processes {
-		if process.State == Evicted {
-			continue
-		}
-		process.State = Cached
-		if id == pid {
-			process.State = Active
-		}
-		r.processes[id] = process
+	process.State = Active
+	r.processes[pid] = process
+	return true
+}
+
+// Cache marks a live process with no visible windows as resumable.
+func (r *ProcessRegistry) Cache(pid int) bool {
+	process, ok := r.processes[pid]
+	if !ok || process.State == Evicted || process.State == Crashed {
+		return false
 	}
+	process.State = Cached
+	r.processes[pid] = process
+	return true
+}
+
+func (r *ProcessRegistry) SetState(pid int, state ProcessState) bool {
+	process, ok := r.processes[pid]
+	if !ok {
+		return false
+	}
+	process.State = state
+	r.processes[pid] = process
 	return true
 }
 

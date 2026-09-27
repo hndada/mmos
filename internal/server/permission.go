@@ -2,9 +2,6 @@ package server
 
 import "errors"
 
-// Permission identifies a protected capability. It is intentionally a closed
-// set so an app cannot invent a capability name that the system forgot to
-// gate.
 type Permission uint8
 
 const (
@@ -24,8 +21,6 @@ const (
 	PermissionDenied
 )
 
-// PermissionRequest is a trusted-dialog item. The requesting app cannot
-// resolve it; only the system UI may do that.
 type PermissionRequest struct {
 	ID         int
 	PackageID  string
@@ -41,14 +36,9 @@ type permissions struct {
 }
 
 func newPermissions() permissions {
-	return permissions{
-		pending:  map[int]PermissionRequest{},
-		decision: map[string]map[Permission]PermissionState{},
-	}
+	return permissions{pending: map[int]PermissionRequest{}, decision: map[string]map[Permission]PermissionState{}}
 }
 
-// RequestPermission creates a trusted confirmation request for the caller's
-// own package. Repeated requests reuse a stored decision.
 func (r *Runtime) RequestPermission(s Session, permission Permission) (PermissionRequest, PermissionState, bool) {
 	if !r.authorized(s) {
 		return PermissionRequest{}, PermissionAsk, false
@@ -66,7 +56,6 @@ func (r *Runtime) RequestPermission(s Session, permission Permission) (Permissio
 	return request, PermissionAsk, true
 }
 
-// ResolvePermission is the trusted-dialog decision boundary.
 func (r *Runtime) ResolvePermission(id int, granted bool) (PermissionRequest, error) {
 	request, ok := r.permissions.pending[id]
 	if !ok {
@@ -81,7 +70,6 @@ func (r *Runtime) ResolvePermission(id int, granted bool) (PermissionRequest, er
 	return request, nil
 }
 
-// PermissionState reports the decision for a session's package.
 func (r *Runtime) PermissionState(s Session, permission Permission) (PermissionState, bool) {
 	if !r.authorized(s) {
 		return PermissionAsk, false
@@ -93,10 +81,19 @@ func (r *Runtime) PermissionState(s Session, permission Permission) (PermissionS
 	return r.permissions.state(process.PackageID, permission), true
 }
 
+// RevokePermission is trusted system policy. Apps can request a capability but
+// cannot grant or revoke decisions for any package.
+func (r *Runtime) RevokePermission(packageID string, permission Permission) bool {
+	if _, ok := r.packages[packageID]; !ok {
+		return false
+	}
+	r.permissions.set(packageID, permission, PermissionAsk)
+	return true
+}
+
 func (p *permissions) state(packageID string, permission Permission) PermissionState {
 	return p.decision[packageID][permission]
 }
-
 func (p *permissions) set(packageID string, permission Permission, state PermissionState) {
 	if p.decision[packageID] == nil {
 		p.decision[packageID] = map[Permission]PermissionState{}

@@ -11,10 +11,12 @@ import (
 
 const (
 	SendMessage client.Command = "send_message"
+	OpenDetails client.Command = "open_details"
 )
 
 type State struct {
 	MessageCount int
+	pages        []string
 }
 
 type App struct {
@@ -29,7 +31,7 @@ func New(pkg *model.AppPackage) *App {
 			Package: pkg,
 			Windows: map[model.WindowID]*client.Window{window.ID: window},
 		},
-		State: &State{},
+		State: &State{pages: []string{"chat"}},
 	}
 }
 
@@ -42,11 +44,28 @@ func (a *App) HandleInput(windowID model.WindowID, event model.InputEvent) bool 
 	if !ok {
 		return false
 	}
-	if command != SendMessage {
+	switch command {
+	case SendMessage:
+		a.State.MessageCount++
+		window.Node("message").Text = fmt.Sprintf("Messages sent: %d", a.State.MessageCount)
+		return true
+	case OpenDetails:
+		a.State.pages = append(a.State.pages, "details")
+		window.Node("message").Text = "Chat details"
+		return true
+	}
+	return false
+}
+
+func (a *App) Page() string { return a.State.pages[len(a.State.pages)-1] }
+
+// Back consumes app-local history before a system Back action changes apps.
+func (a *App) Back() bool {
+	if len(a.State.pages) <= 1 {
 		return false
 	}
-	a.State.MessageCount++
-	window.Node("message").Text = fmt.Sprintf("Messages sent: %d", a.State.MessageCount)
+	a.State.pages = a.State.pages[:len(a.State.pages)-1]
+	a.Process.Windows["chat"].Node("message").Text = "No messages sent."
 	return true
 }
 
@@ -62,6 +81,12 @@ func newWindow() *client.Window {
 			Visible: true,
 			Enabled: true,
 			Command: SendMessage,
+		},
+		{
+			ID: "details", Kind: client.Button,
+			Bounds: geom.Rect{X: 100, Y: 280, Width: 120, Height: 60},
+			Text:   "Details", Visible: true, Enabled: true,
+			Role: client.ButtonRole, Label: "Open chat details", Command: OpenDetails,
 		},
 	}
 	return window

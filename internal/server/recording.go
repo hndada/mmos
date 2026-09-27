@@ -4,16 +4,13 @@ import "errors"
 
 var ErrRecordingActive = errors.New("recording already active")
 
-// Recording is a trusted system-owned capture session. Its frames use the
-// same protected-window filtering as a screenshot.
+// Recording is a trusted system-owned capture session.
 type Recording struct {
 	DisplayID DisplayID
 	Frames    []Frame
 	Active    bool
 }
 
-// StartRecording begins a system capture. Applications never receive a
-// recording handle and therefore cannot capture another app's display.
 func (r *Runtime) StartRecording(displayID DisplayID) error {
 	if _, ok := r.displays[displayID]; !ok {
 		return ErrDisplayNotFound
@@ -25,7 +22,6 @@ func (r *Runtime) StartRecording(displayID DisplayID) error {
 	return nil
 }
 
-// StopRecording returns a copy of the trusted recording and stops capture.
 func (r *Runtime) StopRecording(displayID DisplayID) (Recording, bool) {
 	recording, ok := r.recordings[displayID]
 	if !ok || !recording.Active {
@@ -34,6 +30,16 @@ func (r *Runtime) StopRecording(displayID DisplayID) (Recording, bool) {
 	recording.Active = false
 	recording.Frames = append([]Frame(nil), recording.Frames...)
 	r.recordings[displayID] = recording
+	return recording, true
+}
+
+// Recording returns the current trusted capture session for a display.
+func (r *Runtime) Recording(displayID DisplayID) (Recording, bool) {
+	recording, ok := r.recordings[displayID]
+	if !ok {
+		return Recording{}, false
+	}
+	recording.Frames = append([]Frame(nil), recording.Frames...)
 	return recording, true
 }
 

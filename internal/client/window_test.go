@@ -3,7 +3,7 @@ package client_test
 import (
 	"testing"
 
-	"mmos/internal/app/chat"
+	"mmos/internal/apps/chat"
 	"mmos/internal/common/model"
 )
 

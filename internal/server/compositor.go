@@ -30,14 +30,14 @@ type Compositor struct{ LastFrame Frame }
 
 func (c *Compositor) Compose(id DisplayID, server WindowServer, display DisplayConfig) Frame {
 	layers := make([]Layer, 0, len(server.ZOrder))
-	for zIndex, id := range server.ZOrder {
+	for _, id := range server.ZOrder {
 		window, ok := server.Windows[id]
 		if ok && window.Visible {
 			layers = append(layers, Layer{
 				WindowID: id,
 				Buffer:   window.Buffer,
 				Opacity:  1,
-				ZIndex:   zIndex,
+				ZIndex:   len(layers),
 			})
 		}
 	}
@@ -48,4 +48,19 @@ func (c *Compositor) Compose(id DisplayID, server WindowServer, display DisplayC
 		Layers:    layers,
 	}
 	return c.LastFrame
+}
+
+// Capture returns the most recently composed frame without excluded windows.
+// The caller owns the policy that decides which windows to exclude.
+func (c Compositor) Capture(excluded map[WindowID]bool) Frame {
+	capture := c.LastFrame
+	capture.Layers = make([]Layer, 0, len(c.LastFrame.Layers))
+	for _, layer := range c.LastFrame.Layers {
+		if excluded[layer.WindowID] {
+			continue
+		}
+		layer.ZIndex = len(capture.Layers)
+		capture.Layers = append(capture.Layers, layer)
+	}
+	return capture
 }

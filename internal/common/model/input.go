@@ -1,30 +1,7 @@
-// Package model defines the contract shared by clients and the server.
 package model
 
-import "mmos/internal/common/geom"
-
-type AppPackage struct{ ID, EntryPoint string }
-type Theme uint8
-
-const (
-	LightTheme Theme = iota
-	DarkTheme
-)
-
-type SystemConfig struct {
-	Revision uint64
-	Theme    Theme
-}
-
-func DefaultSystemConfig() SystemConfig { return SystemConfig{Revision: 1, Theme: LightTheme} }
-
-type WindowID string
-type Buffer struct {
-	Revision int
-	Content  string
-	Bounds   geom.Rect
-}
 type InputEvent interface{ isInputEvent() }
+
 type PointerAction uint8
 
 const (
@@ -48,6 +25,7 @@ type PointerSample struct {
 	X, Y     int
 	Pressure float32
 }
+
 type PointerEvent struct {
 	Action           PointerAction
 	Source           PointerSource
@@ -56,6 +34,7 @@ type PointerEvent struct {
 }
 
 func (PointerEvent) isInputEvent() {}
+
 func (e PointerEvent) PointerByID(id int) (PointerSample, bool) {
 	for _, p := range e.Pointers {
 		if p.ID == id {
@@ -94,3 +73,25 @@ type ScrollEvent struct {
 }
 
 func (ScrollEvent) isInputEvent() {}
+
+type SystemAction uint8
+
+const (
+	SystemBack SystemAction = iota
+	SystemHome
+	SystemUnlock
+	SystemSettings
+	SystemScreenOff
+	SystemScreenOn
+	SystemNotices
+	SystemRecents
+)
+
+type SystemEvent struct{ Action SystemAction }
+
+func (SystemEvent) isInputEvent() {}
+
+// RotateEvent requests a server-owned display orientation change.
+type RotateEvent struct{}
+
+func (RotateEvent) isInputEvent() {}

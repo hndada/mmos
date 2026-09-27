@@ -2,19 +2,8 @@ package server
 
 import "mmos/internal/common/model"
 
-// ResourceLimit is a trusted per-process budget. Zero means unlimited for
-// that resource, which keeps the base POC lightweight until policy enables a
-// limit.
-type ResourceLimit struct {
-	MemoryBytes int
-	CPUUnits    int
-	GPUUnits    int
-}
-
-type resourceUse struct {
-	CPUUnits int
-	GPUUnits int
-}
+type ResourceLimit struct{ MemoryBytes, CPUUnits, GPUUnits int }
+type resourceUse struct{ CPUUnits, GPUUnits int }
 
 func (r *Runtime) SetResourceLimit(packageID string, limit ResourceLimit) bool {
 	if _, ok := r.packages[packageID]; !ok || limit.MemoryBytes < 0 || limit.CPUUnits < 0 || limit.GPUUnits < 0 {
@@ -24,17 +13,13 @@ func (r *Runtime) SetResourceLimit(packageID string, limit ResourceLimit) bool {
 	return true
 }
 
-// Charge records CPU/GPU work for the current accounting interval. It rejects
-// excess work instead of silently allowing an app to exceed its quota.
 func (r *Runtime) Charge(s Session, cpu, gpu int) bool {
 	if !r.authorized(s) || cpu < 0 || gpu < 0 {
 		return false
 	}
 	process := r.processes.processes[s.pid]
-	limit := r.limits[process.PackageID]
-	use := r.usage[s.pid]
-	if limit.CPUUnits > 0 && use.CPUUnits+cpu > limit.CPUUnits ||
-		limit.GPUUnits > 0 && use.GPUUnits+gpu > limit.GPUUnits {
+	limit, use := r.limits[process.PackageID], r.usage[s.pid]
+	if limit.CPUUnits > 0 && use.CPUUnits+cpu > limit.CPUUnits || limit.GPUUnits > 0 && use.GPUUnits+gpu > limit.GPUUnits {
 		return false
 	}
 	use.CPUUnits += cpu
@@ -43,12 +28,10 @@ func (r *Runtime) Charge(s Session, cpu, gpu int) bool {
 	return true
 }
 
-// ResetUsage begins a new trusted accounting interval.
 func (r *Runtime) ResetUsage() { r.usage = map[int]resourceUse{} }
 
 func (r *Runtime) acceptsBuffer(s Session, buffer model.Buffer) bool {
-	process := r.processes.processes[s.pid]
-	limit := r.limits[process.PackageID]
+	limit := r.limits[r.processes.processes[s.pid].PackageID]
 	if limit.MemoryBytes == 0 {
 		return true
 	}

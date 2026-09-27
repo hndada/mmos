@@ -1,7 +1,8 @@
 package sim
 
 import (
-	"mmos/internal/app/chat"
+	"mmos/internal/apps/chat"
+	"mmos/internal/apps/history"
 	"mmos/internal/client"
 	"mmos/internal/server"
 )
@@ -11,6 +12,11 @@ func (s *Simulator) LaunchChat() bool {
 	if err != nil {
 		return false
 	}
+	splash, ok := s.lock.ShowSplash(launch.Package.ID)
+	if !ok {
+		return false
+	}
+	s.splash = splash
 	if !launch.Reused {
 		s.chatSession, s.chat = launch.Session, chat.New(launch.Package)
 		s.chat.Process.Configure(s.runtime.Config())
@@ -25,12 +31,13 @@ func (s *Simulator) LaunchChat() bool {
 	} else {
 		s.chatSession = launch.Session
 	}
-	if s.chat == nil || !s.runtime.Activate(s.chatSession, "chat") {
+	if s.chat == nil || !s.runtime.Activate(s.chatSession, "chat") || !s.lock.HideSplash() {
 		return false
 	}
-	_, ok := s.present(s.chatSession, s.chat.Process, "chat")
+	_, ok = s.present(s.chatSession, s.chat.Process, "chat")
 	return ok
 }
+
 func (s *Simulator) activateHome() server.Frame {
 	if !s.runtime.Activate(s.homeSession, s.homeWindow().ID) {
 		return s.runtime.LastFrame(displayID)
@@ -42,21 +49,29 @@ func (s *Simulator) activateHome() server.Frame {
 	return frame
 }
 
-// Back restores the most recently active app window through the server.
-func (s *Simulator) Back() server.Frame {
-	id, ok := s.runtime.Back()
-	if !ok {
-		return s.runtime.LastFrame(displayID)
-	}
+func (s *Simulator) activate(id server.WindowID) server.Frame {
 	if id == s.homeWindow().ID {
-		frame, _ := s.present(s.homeSession, s.homeApp.Process, id)
-		return frame
+		return s.activateHome()
 	}
-	if s.chat != nil && id == "chat" {
+	if id == "chat" && s.chat != nil && s.runtime.Activate(s.chatSession, id) {
 		frame, _ := s.present(s.chatSession, s.chat.Process, id)
 		return frame
 	}
 	return s.runtime.LastFrame(displayID)
+}
+
+func (s *Simulator) historyEntries() []history.Entry {
+	entries := []history.Entry{{WindowID: s.homeWindow().ID, Label: "Home"}}
+	if s.chat != nil {
+		entries = append([]history.Entry{{WindowID: "chat", Label: "Chat"}}, entries...)
+	}
+	return entries
+}
+
+// Back restores the most recently active app window through the server.
+func (s *Simulator) Back() server.Frame {
+	frame, _ := s.Input(server.SystemEvent{Action: server.SystemBack})
+	return frame
 }
 func (s *Simulator) draw(session server.Session, process *client.AppProcess, id server.WindowID) bool {
 	window, ok := process.Windows[id]
@@ -73,6 +88,14 @@ func (s *Simulator) present(session server.Session, process *client.AppProcess, 
 	}
 	s.drawer.Draw(window)
 	return s.runtime.Present(session, id, window.Buffer)
+}
+func (s *Simulator) resize(session server.Session, process *client.AppProcess, id server.WindowID, bounds server.Rect) bool {
+	window, ok := process.Windows[id]
+	if !ok || !s.runtime.ResizeWindow(session, id, bounds) {
+		return false
+	}
+	window.Resize(bounds)
+	return true
 }
 func (s *Simulator) presentForeground() server.Frame {
 	if s.runtime.Foreground(displayID) == "chat" && s.chat != nil {

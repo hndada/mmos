@@ -49,6 +49,16 @@ func (w *Window) Bounds() geom.Rect {
 	return geom.Rect{Width: w.Root.Bounds.Width, Height: w.Root.Bounds.Height}
 }
 
+// Resize updates the client layout extent after the server changes display
+// configuration. The next Drawer call produces a buffer for these bounds.
+func (w *Window) Resize(bounds geom.Rect) {
+	if w.Root == nil {
+		return
+	}
+	w.Root.Bounds = bounds
+	w.Buffer = model.Buffer{}
+}
+
 func NewWindow(id model.WindowID, rootID string) *Window {
 	return &Window{
 		ID: id,

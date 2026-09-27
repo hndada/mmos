@@ -1,42 +1,29 @@
 package server
 
-import (
-	"time"
-
-	"mmos/internal/common/model"
-)
+import "time"
 
 const transitionDuration = 180 * time.Millisecond
 
-// transition retains the previous app Buffer while a newly foregrounded app
-// fades in. It is scoped to one display and never changes window ownership.
+// transition retains the previous buffer while the newly focused window fades
+// in. It is scoped to one display and never changes window ownership.
 type transition struct {
 	from    Layer
-	to      model.WindowID
+	to      WindowID
 	started time.Time
 }
 
-func (t *transition) start(from *Window, to model.WindowID) {
+func (t *transition) start(from *Window, to WindowID) {
 	if from == nil || from.ID == to {
 		t.clear()
 		return
 	}
-	t.from = Layer{
-		WindowID: from.ID,
-		Buffer:   from.Buffer,
-		Opacity:  1,
-	}
+	t.from = Layer{WindowID: from.ID, Buffer: from.Buffer, Opacity: 1}
 	t.to = to
 	t.started = time.Now()
 }
 
-func (t *transition) clear() {
-	*t = transition{}
-}
-
-func (t *transition) active() bool {
-	return !t.started.IsZero()
-}
+func (t *transition) clear()       { *t = transition{} }
+func (t *transition) active() bool { return !t.started.IsZero() }
 
 func (t *transition) apply(layers []Layer, now time.Time) []Layer {
 	if !t.active() {
@@ -54,6 +41,12 @@ func (t *transition) apply(layers []Layer, now time.Time) []Layer {
 		layers[i].Opacity = progress
 		from := t.from
 		from.Opacity = 1 - progress
+		for j := range layers {
+			if layers[j].WindowID == from.WindowID {
+				layers[j].Opacity = from.Opacity
+				return layers
+			}
+		}
 		layers = append(layers, Layer{})
 		copy(layers[i+1:], layers[i:])
 		layers[i] = from
