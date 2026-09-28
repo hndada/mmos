@@ -50,6 +50,7 @@ type display struct {
 	input      InputDispatcher
 	compositor Compositor
 	transition transition
+	motion     motion
 }
 
 func NewRuntime(installed ...*AppPackage) Runtime {
@@ -427,7 +428,9 @@ func (r *Runtime) VSync(displayID DisplayID) Frame {
 		return display.compositor.LastFrame
 	}
 	frame := display.compositor.Compose(displayID, display.windows, display.config)
-	frame.Layers = display.transition.apply(frame.Layers, time.Now())
+	now := time.Now()
+	frame.Layers = display.transition.apply(frame.Layers, now)
+	frame.Layers = display.motion.apply(frame.Layers, now)
 	display.compositor.LastFrame = frame
 	r.record(displayID)
 	return frame
@@ -547,6 +550,29 @@ func (r *Runtime) ShowSystemWindow(id WindowID) bool {
 		return false
 	}
 	return r.displays[displayID].windows.Activate(id)
+}
+
+// SlideSystemWindow animates a visible trusted system window from offsetY
+// pixels below its final position. Application windows cannot use this API.
+// The next VSync samples the motion; callers should submit the final buffer
+// before starting it.
+func (r *Runtime) SlideSystemWindow(id WindowID, offsetY int, duration time.Duration) bool {
+	displayID, ok := r.displayOf[id]
+	if !ok || offsetY <= 0 || duration <= 0 {
+		return false
+	}
+	if _, appOwned := r.owner[id]; appOwned {
+		return false
+	}
+	window := r.displays[displayID].windows.Windows[id]
+	if window == nil || !window.Visible {
+		return false
+	}
+	if r.config.ReducedMotion {
+		return true
+	}
+	r.displays[displayID].motion.start(id, offsetY, duration)
+	return true
 }
 
 func (r *Runtime) HideSystemWindow(id WindowID) bool {

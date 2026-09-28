@@ -5,19 +5,23 @@ import (
 	"mmos/internal/client"
 	"mmos/internal/common/geom"
 	"mmos/internal/common/model"
+	"mmos/internal/protocol"
 )
 
-const OpenChat client.Command = "open_chat"
+const (
+	OpenChat     client.Command = "open_chat"
+	OpenSettings client.Command = "open_settings"
+)
 
 // App is the Home application's client-side instance.
 type App struct {
-	Process *client.AppProcess
-	launch  func() bool
+	Process  *client.AppProcess
+	launcher protocol.Launcher
 }
 
-// New creates the Home application. launch starts the selected application
-// after Home has interpreted an icon command.
-func New(pkg *model.AppPackage, launch func() bool) *App {
+// New creates the Home application. launcher is the process's connection to
+// the system launch endpoint.
+func New(pkg *model.AppPackage, launcher protocol.Launcher) *App {
 	window := client.NewWindow("home", "Home")
 	window.Root.Children = []*client.UINode{
 		{
@@ -25,13 +29,18 @@ func New(pkg *model.AppPackage, launch func() bool) *App {
 			Bounds: geom.Rect{X: 100, Y: 180, Width: 120, Height: 60},
 			Text:   "Chat", Visible: true, Enabled: true, Command: OpenChat,
 		},
+		{
+			ID: "settings", Kind: client.Button,
+			Bounds: geom.Rect{X: 100, Y: 260, Width: 120, Height: 60},
+			Text:   "Settings", Visible: true, Enabled: true, Command: OpenSettings,
+		},
 	}
 	return &App{
 		Process: &client.AppProcess{
 			Package: pkg,
 			Windows: map[model.WindowID]*client.Window{window.ID: window},
 		},
-		launch: launch,
+		launcher: launcher,
 	}
 }
 
@@ -39,12 +48,25 @@ func New(pkg *model.AppPackage, launch func() bool) *App {
 // selected installed app through the system-provided launch function.
 func (a *App) HandleInput(windowID model.WindowID, event model.InputEvent) bool {
 	window, ok := a.Process.Windows[windowID]
-	if !ok || a.launch == nil {
+	if !ok {
 		return false
 	}
 	command, ok := window.CommandAt(event)
-	if !ok || command != OpenChat {
+	if !ok {
 		return false
 	}
-	return a.launch()
+	switch command {
+	case OpenChat:
+		return a.launch("chat-app")
+	case OpenSettings:
+		return a.launch("settings-app")
+	}
+	return false
+}
+
+func (a *App) launch(packageID string) bool {
+	if a.launcher == nil {
+		return false
+	}
+	return a.launcher.Launch(protocol.LaunchRequest{PackageID: packageID}).Started
 }

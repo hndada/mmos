@@ -22,6 +22,22 @@ func TestSimulatorCoreFlow(t *testing.T) {
 	}
 }
 
+func TestSimulatorChangesConfigurationFromSettings(t *testing.T) {
+	s, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, changed := tap(s, 160, 290); !changed || s.Foreground() != "settings" {
+		t.Fatal("launch settings")
+	}
+	if _, changed := tap(s, 160, 120); !changed || s.runtime.Config().Theme != server.DarkTheme {
+		t.Fatalf("toggle theme: changed=%t config=%#v", changed, s.runtime.Config())
+	}
+	if _, changed := tap(s, 160, 200); !changed || !s.runtime.Config().LockOnScreenOff {
+		t.Fatalf("toggle lock: changed=%t config=%#v", changed, s.runtime.Config())
+	}
+}
+
 func TestSimulatorOpensNotificationShadeFromTopPull(t *testing.T) {
 	s, err := New()
 	if err != nil {
@@ -109,6 +125,33 @@ func TestSimulatorKeepsVisibleWindowsInOneFrame(t *testing.T) {
 	frame := s.Frame()
 	if len(frame.Layers) != 3 || !frame.Presents("status", 1) || !frame.Presents("home", 1) || !frame.Presents("chat", 1) {
 		t.Fatalf("frame = %#v", frame)
+	}
+}
+
+func TestSimulatorRoutesKeyboardCompositionToFocusedChat(t *testing.T) {
+	s, err := New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, changed := tap(s, 160, 210); !changed {
+		t.Fatal("launch chat")
+	}
+	if _, changed := tap(s, 40, 150); !changed || !s.ime.Visible() {
+		t.Fatal("focus editor and show ime")
+	}
+	if s.chat.State.KeyboardInset == 0 || s.chat.Process.Windows["chat"].Node("send").Bounds.Y >= 336 {
+		t.Fatalf("chat did not move above ime: %#v", s.chat.State)
+	}
+	tap(s, 112, 360) // ㄱ
+	tap(s, 240, 408) // ㅏ
+	if s.chat.State.Composition != "가" || s.chat.State.Draft != "" {
+		t.Fatalf("preedit = %#v", s.chat.State)
+	}
+	if _, changed := tap(s, 160, 456); !changed || s.chat.State.Draft != "가" || s.chat.State.Composition != "" {
+		t.Fatalf("commit = %#v changed=%t", s.chat.State, changed)
+	}
+	if _, changed := s.Input(server.SystemEvent{Action: server.SystemBack}); !changed || s.ime.Visible() || s.chat.State.KeyboardInset != 0 {
+		t.Fatalf("hide ime = visible:%t state:%#v", s.ime.Visible(), s.chat.State)
 	}
 }
 

@@ -4,14 +4,24 @@ import (
 	"testing"
 
 	"mmos/internal/common/model"
+	"mmos/internal/protocol"
 )
+
+type launcherFunc func(protocol.LaunchRequest) protocol.LaunchReply
+
+func (f launcherFunc) Launch(request protocol.LaunchRequest) protocol.LaunchReply {
+	return f(request)
+}
 
 func TestHandleInputLaunchesSelectedApp(t *testing.T) {
 	launched := false
-	app := New(&model.AppPackage{ID: "home"}, func() bool {
+	app := New(&model.AppPackage{ID: "home"}, launcherFunc(func(request protocol.LaunchRequest) protocol.LaunchReply {
+		if request.PackageID != "chat-app" {
+			t.Fatalf("package = %q", request.PackageID)
+		}
 		launched = true
-		return true
-	})
+		return protocol.LaunchReply{Started: true}
+	}))
 
 	changed := app.HandleInput("home", model.PointerEvent{
 		Source:           model.TouchSource,

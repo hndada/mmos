@@ -4,7 +4,10 @@ type Layer struct {
 	WindowID WindowID
 	Buffer   Buffer
 	Opacity  float64
-	ZIndex   int
+	// OffsetY is a compositor-only vertical translation in display logical
+	// coordinates. It leaves client and server window bounds unchanged.
+	OffsetY int
+	ZIndex  int
 }
 
 type Frame struct {

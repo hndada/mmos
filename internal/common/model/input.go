@@ -60,7 +60,10 @@ type KeyEvent struct {
 func (KeyEvent) isInputEvent() {}
 
 type TextEvent struct {
-	Text      string
+	// Text is the complete current composition when Composing is true. When it
+	// is false, Text is committed text and must be inserted permanently.
+	Text string
+	// Composing distinguishes a replaceable IME preedit from committed text.
 	Composing bool
 }
 
