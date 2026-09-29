@@ -9,9 +9,3 @@ type AppProcess struct {
 	Windows map[model.WindowID]*Window
 	Config  model.SystemConfig
 }
-
-// Configure records the latest system configuration before the application
-// lays out its UI and submits another buffer.
-func (p *AppProcess) Configure(config model.SystemConfig) {
-	p.Config = config
-}

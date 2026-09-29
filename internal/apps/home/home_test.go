@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"mmos/internal/common/model"
-	"mmos/internal/protocol"
+	"mmos/internal/common/protocol"
 )
 
 type launcherFunc func(protocol.LaunchRequest) protocol.LaunchReply

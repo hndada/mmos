@@ -1,25 +1,25 @@
-package sim
+package main
 
 import (
 	"mmos/internal/apps/chat"
 	"mmos/internal/apps/history"
 	"mmos/internal/apps/settings"
 	"mmos/internal/client"
-	"mmos/internal/protocol"
+	"mmos/internal/common/protocol"
 	"mmos/internal/server"
 )
 
 // inProcessLauncher is the simulator's local transport endpoint. Replacing
 // it with an IPC client leaves application code and protocol messages intact.
 type inProcessLauncher struct {
-	simulator *Simulator
+	sim *simulator
 }
 
 func (l inProcessLauncher) Launch(request protocol.LaunchRequest) protocol.LaunchReply {
-	return l.simulator.launch(request)
+	return l.sim.launch(request)
 }
 
-func (s *Simulator) launch(request protocol.LaunchRequest) protocol.LaunchReply {
+func (s *simulator) launch(request protocol.LaunchRequest) protocol.LaunchReply {
 	switch request.PackageID {
 	case "chat-app":
 		return s.launchChat()
@@ -29,11 +29,7 @@ func (s *Simulator) launch(request protocol.LaunchRequest) protocol.LaunchReply 
 	return protocol.LaunchReply{}
 }
 
-func (s *Simulator) LaunchChat() bool {
-	return s.launchChat().Started
-}
-
-func (s *Simulator) launchChat() protocol.LaunchReply {
+func (s *simulator) launchChat() protocol.LaunchReply {
 	launch, err := s.runtime.Launch("chat-app")
 	if err != nil {
 		return protocol.LaunchReply{}
@@ -45,7 +41,7 @@ func (s *Simulator) launchChat() protocol.LaunchReply {
 	s.splash = splash
 	if !launch.Reused {
 		s.chatSession, s.chat = launch.Session, chat.New(launch.Package)
-		s.chat.Process.Configure(s.runtime.Config())
+		s.chat.Process.Config = s.runtime.Config()
 		window := s.chat.Process.Windows["chat"]
 		_, ok := s.runtime.Display(displayID)
 		if !ok {
@@ -64,11 +60,7 @@ func (s *Simulator) launchChat() protocol.LaunchReply {
 	return protocol.LaunchReply{Started: ok, Reused: ok && launch.Reused}
 }
 
-func (s *Simulator) LaunchSettings() bool {
-	return s.launchSettings().Started
-}
-
-func (s *Simulator) launchSettings() protocol.LaunchReply {
+func (s *simulator) launchSettings() protocol.LaunchReply {
 	launch, err := s.runtime.Launch("settings-app")
 	if err != nil {
 		return protocol.LaunchReply{}
@@ -96,13 +88,13 @@ func (s *Simulator) launchSettings() protocol.LaunchReply {
 	return protocol.LaunchReply{Started: ok, Reused: ok && launch.Reused}
 }
 
-func (s *Simulator) applySettings(config server.SystemConfig) bool {
+func (s *simulator) applySettings(config server.SystemConfig) bool {
 	s.runtime.SetConfig(config)
 	s.applyConfig(s.runtime.Config())
 	return true
 }
 
-func (s *Simulator) activateHome() server.Frame {
+func (s *simulator) activateHome() server.Frame {
 	if !s.runtime.Activate(s.homeSession, s.homeWindow().ID) {
 		return s.runtime.LastFrame(displayID)
 	}
@@ -113,7 +105,7 @@ func (s *Simulator) activateHome() server.Frame {
 	return frame
 }
 
-func (s *Simulator) activate(id server.WindowID) server.Frame {
+func (s *simulator) activate(id server.WindowID) server.Frame {
 	if id == s.homeWindow().ID {
 		return s.activateHome()
 	}
@@ -128,7 +120,7 @@ func (s *Simulator) activate(id server.WindowID) server.Frame {
 	return s.runtime.LastFrame(displayID)
 }
 
-func (s *Simulator) historyEntries() []history.Entry {
+func (s *simulator) historyEntries() []history.Entry {
 	entries := []history.Entry{{WindowID: s.homeWindow().ID, Label: "Home"}}
 	if s.chat != nil {
 		entries = append([]history.Entry{{WindowID: "chat", Label: "Chat"}}, entries...)
@@ -139,20 +131,12 @@ func (s *Simulator) historyEntries() []history.Entry {
 	return entries
 }
 
-// Back restores the most recently active app window through the server.
-func (s *Simulator) Back() server.Frame {
-	frame, _ := s.Input(server.SystemEvent{Action: server.SystemBack})
+// back restores the most recently active app window through the server.
+func (s *simulator) back() server.Frame {
+	frame, _ := s.input(server.SystemEvent{Action: server.SystemBack})
 	return frame
 }
-func (s *Simulator) draw(session server.Session, process *client.AppProcess, id server.WindowID) bool {
-	window, ok := process.Windows[id]
-	if !ok {
-		return false
-	}
-	s.drawer.Draw(window)
-	return s.runtime.Submit(session, id, window.Buffer)
-}
-func (s *Simulator) present(session server.Session, process *client.AppProcess, id server.WindowID) (server.Frame, bool) {
+func (s *simulator) present(session server.Session, process *client.AppProcess, id server.WindowID) (server.Frame, bool) {
 	window, ok := process.Windows[id]
 	if !ok {
 		return s.runtime.LastFrame(displayID), false
@@ -160,7 +144,7 @@ func (s *Simulator) present(session server.Session, process *client.AppProcess, 
 	s.drawer.Draw(window)
 	return s.runtime.Present(session, id, window.Buffer)
 }
-func (s *Simulator) resize(session server.Session, process *client.AppProcess, id server.WindowID, bounds server.Rect) bool {
+func (s *simulator) resize(session server.Session, process *client.AppProcess, id server.WindowID, bounds server.Rect) bool {
 	window, ok := process.Windows[id]
 	if !ok || !s.runtime.ResizeWindow(session, id, bounds) {
 		return false
@@ -168,7 +152,7 @@ func (s *Simulator) resize(session server.Session, process *client.AppProcess, i
 	window.Resize(bounds)
 	return true
 }
-func (s *Simulator) presentForeground() server.Frame {
+func (s *simulator) presentForeground() server.Frame {
 	if s.runtime.Foreground(displayID) == "chat" && s.chat != nil {
 		frame, _ := s.present(s.chatSession, s.chat.Process, "chat")
 		return frame
@@ -180,11 +164,11 @@ func (s *Simulator) presentForeground() server.Frame {
 	frame, _ := s.present(s.homeSession, s.homeApp.Process, s.homeWindow().ID)
 	return frame
 }
-func (s *Simulator) homeWindow() *client.Window { return s.homeApp.Process.Windows["home"] }
-func (s *Simulator) applyConfig(config server.SystemConfig) {
-	s.homeApp.Process.Configure(config)
+func (s *simulator) homeWindow() *client.Window { return s.homeApp.Process.Windows["home"] }
+func (s *simulator) applyConfig(config server.SystemConfig) {
+	s.homeApp.Process.Config = config
 	if s.chat != nil {
-		s.chat.Process.Configure(config)
+		s.chat.Process.Config = config
 	}
 	if s.settings != nil {
 		s.settings.Configure(config)

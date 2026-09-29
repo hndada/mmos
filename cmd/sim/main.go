@@ -5,23 +5,22 @@ import (
 	"os"
 
 	"mmos/internal/server"
-	"mmos/internal/sim"
 )
 
 func main() {
-	s, err := sim.New()
+	s, err := newSimulator()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
-	s.Input(tap(server.PointerDown, 160, 210))
-	s.Input(tap(server.PointerUp, 160, 210))
-	s.Input(tap(server.PointerDown, 160, 236))
-	frame, changed := s.Input(tap(server.PointerUp, 160, 236))
+	s.input(pointerEvent(server.PointerDown, 160, 210))
+	s.input(pointerEvent(server.PointerUp, 160, 210))
+	s.input(pointerEvent(server.PointerDown, 160, 236))
+	frame, changed := s.input(pointerEvent(server.PointerUp, 160, 236))
 	fmt.Printf("frame=%d message_changed=%t\n", frame.Number, changed)
 }
 
-func tap(action server.PointerAction, x, y int) server.PointerEvent {
+func pointerEvent(action server.PointerAction, x, y int) server.PointerEvent {
 	return server.PointerEvent{
 		Source:           server.TouchSource,
 		Action:           action,

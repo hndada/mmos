@@ -5,7 +5,7 @@ import (
 	"mmos/internal/client"
 	"mmos/internal/common/geom"
 	"mmos/internal/common/model"
-	"mmos/internal/protocol"
+	"mmos/internal/common/protocol"
 )
 
 const (
@@ -13,15 +13,20 @@ const (
 	OpenSettings client.Command = "open_settings"
 )
 
+// Launcher is Home's view of the system launch endpoint.
+type Launcher interface {
+	Launch(protocol.LaunchRequest) protocol.LaunchReply
+}
+
 // App is the Home application's client-side instance.
 type App struct {
 	Process  *client.AppProcess
-	launcher protocol.Launcher
+	launcher Launcher
 }
 
 // New creates the Home application. launcher is the process's connection to
 // the system launch endpoint.
-func New(pkg *model.AppPackage, launcher protocol.Launcher) *App {
+func New(pkg *model.AppPackage, launcher Launcher) *App {
 	window := client.NewWindow("home", "Home")
 	window.Root.Children = []*client.UINode{
 		{

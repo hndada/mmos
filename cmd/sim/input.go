@@ -1,10 +1,10 @@
-package sim
+package main
 
 import (
 	"mmos/internal/server"
 )
 
-func (s *Simulator) Input(event server.InputEvent) (server.Frame, bool) {
+func (s *simulator) input(event server.InputEvent) (server.Frame, bool) {
 	if _, ok := event.(server.RotateEvent); ok {
 		return s.rotate()
 	}
@@ -30,7 +30,7 @@ func (s *Simulator) Input(event server.InputEvent) (server.Frame, bool) {
 		if system.Action == server.SystemHome {
 			return s.activateHome(), true
 		}
-		if system.Action == server.SystemBack && s.chat != nil && s.Foreground() == "chat" && s.chat.Back() {
+		if system.Action == server.SystemBack && s.chat != nil && s.foreground() == "chat" && s.chat.Back() {
 			return s.present(s.chatSession, s.chat.Process, "chat")
 		}
 		if system.Action == server.SystemBack {
@@ -87,7 +87,7 @@ func (s *Simulator) Input(event server.InputEvent) (server.Frame, bool) {
 	return s.runtime.LastFrame(displayID), false
 }
 
-func (s *Simulator) rotate() (server.Frame, bool) {
+func (s *simulator) rotate() (server.Frame, bool) {
 	display, ok := s.runtime.Rotate(displayID)
 	if !ok {
 		return s.runtime.LastFrame(displayID), false

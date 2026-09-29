@@ -1,4 +1,4 @@
-package sim
+package main
 
 import (
 	"testing"
@@ -7,27 +7,27 @@ import (
 )
 
 func TestSimulatorCoreFlow(t *testing.T) {
-	s, err := New()
+	s, err := newSimulator()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, changed := tap(s, 160, 210); !changed || s.Foreground() != "chat" {
+	if _, changed := tap(s, 160, 210); !changed || s.foreground() != "chat" {
 		t.Fatal("launch chat")
 	}
 	if _, changed := tap(s, 160, 236); !changed {
 		t.Fatal("send message")
 	}
-	if frame := s.Back(); s.Foreground() != "home" || !frame.Presents("home", 2) {
-		t.Fatalf("back = foreground:%q frame:%#v", s.Foreground(), frame)
+	if frame := s.back(); s.foreground() != "home" || !frame.Presents("home", 2) {
+		t.Fatalf("back = foreground:%q frame:%#v", s.foreground(), frame)
 	}
 }
 
 func TestSimulatorChangesConfigurationFromSettings(t *testing.T) {
-	s, err := New()
+	s, err := newSimulator()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, changed := tap(s, 160, 290); !changed || s.Foreground() != "settings" {
+	if _, changed := tap(s, 160, 290); !changed || s.foreground() != "settings" {
 		t.Fatal("launch settings")
 	}
 	if _, changed := tap(s, 160, 120); !changed || s.runtime.Config().Theme != server.DarkTheme {
@@ -39,7 +39,7 @@ func TestSimulatorChangesConfigurationFromSettings(t *testing.T) {
 }
 
 func TestSimulatorOpensNotificationShadeFromTopPull(t *testing.T) {
-	s, err := New()
+	s, err := newSimulator()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,8 +49,8 @@ func TestSimulatorOpensNotificationShadeFromTopPull(t *testing.T) {
 	if _, changed := tap(s, 160, 236); !changed {
 		t.Fatal("publish notice")
 	}
-	s.Input(pointer(server.PointerDown, 160, 8))
-	frame, changed := s.Input(pointer(server.PointerUp, 160, 140))
+	s.input(pointer(server.PointerDown, 160, 8))
+	frame, changed := s.input(pointer(server.PointerUp, 160, 140))
 	if !changed || !frame.Presents("notices", 1) {
 		t.Fatalf("notification shade = %#v changed=%t", frame, changed)
 	}
@@ -62,20 +62,20 @@ func TestSimulatorOpensNotificationShadeFromTopPull(t *testing.T) {
 }
 
 func TestSimulatorShowsRecentsAndSelectsTask(t *testing.T) {
-	s, err := New()
+	s, err := newSimulator()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, changed := tap(s, 160, 210); !changed {
 		t.Fatal("launch chat")
 	}
-	frame, changed := s.Input(server.SystemEvent{Action: server.SystemRecents})
+	frame, changed := s.input(server.SystemEvent{Action: server.SystemRecents})
 	if !changed || !frame.Presents("history", 1) {
 		t.Fatalf("recents: changed=%t frame=%#v", changed, frame)
 	}
 	frame, changed = tap(s, 160, 176)
-	if !changed || s.Foreground() != "home" || !frame.Presents("home", 2) {
-		t.Fatalf("select home: changed=%t foreground=%q frame=%#v", changed, s.Foreground(), frame)
+	if !changed || s.foreground() != "home" || !frame.Presents("home", 2) {
+		t.Fatalf("select home: changed=%t foreground=%q frame=%#v", changed, s.foreground(), frame)
 	}
 }
 
@@ -89,24 +89,24 @@ func pointer(action server.PointerAction, x, y int) server.PointerEvent {
 }
 
 func TestSimulatorShowsSplashUntilAppFirstFrame(t *testing.T) {
-	s, err := New()
+	s, err := newSimulator()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !s.SplashFrame().Presents("splash", 1) || s.Frame().Presents("splash", 1) {
-		t.Fatalf("splash=%#v frame=%#v", s.SplashFrame(), s.Frame())
+	if !s.splashFrame().Presents("splash", 1) || s.frame().Presents("splash", 1) {
+		t.Fatalf("splash=%#v frame=%#v", s.splashFrame(), s.frame())
 	}
 }
 
 func TestSimulatorRelayoutsClientsAfterRotation(t *testing.T) {
-	s, err := New()
+	s, err := newSimulator()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, changed := tap(s, 160, 210); !changed {
 		t.Fatal("launch chat")
 	}
-	frame, changed := s.Input(server.RotateEvent{})
+	frame, changed := s.input(server.RotateEvent{})
 	if !changed || frame.Display.Bounds().Width != 480 || frame.Display.Bounds().Height != 320 ||
 		s.homeWindow().Bounds() != frame.Display.Bounds() || s.chat.Process.Windows["chat"].Bounds() != frame.Display.Bounds() ||
 		!frame.Presents("chat", 1) {
@@ -115,21 +115,21 @@ func TestSimulatorRelayoutsClientsAfterRotation(t *testing.T) {
 }
 
 func TestSimulatorKeepsVisibleWindowsInOneFrame(t *testing.T) {
-	s, err := New()
+	s, err := newSimulator()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if _, changed := tap(s, 160, 210); !changed {
 		t.Fatal("launch chat")
 	}
-	frame := s.Frame()
+	frame := s.frame()
 	if len(frame.Layers) != 3 || !frame.Presents("status", 1) || !frame.Presents("home", 1) || !frame.Presents("chat", 1) {
 		t.Fatalf("frame = %#v", frame)
 	}
 }
 
 func TestSimulatorRoutesKeyboardCompositionToFocusedChat(t *testing.T) {
-	s, err := New()
+	s, err := newSimulator()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,34 +150,34 @@ func TestSimulatorRoutesKeyboardCompositionToFocusedChat(t *testing.T) {
 	if _, changed := tap(s, 160, 456); !changed || s.chat.State.Draft != "가" || s.chat.State.Composition != "" {
 		t.Fatalf("commit = %#v changed=%t", s.chat.State, changed)
 	}
-	if _, changed := s.Input(server.SystemEvent{Action: server.SystemBack}); !changed || s.ime.Visible() || s.chat.State.KeyboardInset != 0 {
+	if _, changed := s.input(server.SystemEvent{Action: server.SystemBack}); !changed || s.ime.Visible() || s.chat.State.KeyboardInset != 0 {
 		t.Fatalf("hide ime = visible:%t state:%#v", s.ime.Visible(), s.chat.State)
 	}
 }
 
 func TestSimulatorUnlocksThroughLockScreenControl(t *testing.T) {
-	s, err := New()
+	s, err := newSimulator()
 	if err != nil {
 		t.Fatal(err)
 	}
 	config := s.runtime.Config()
 	config.LockOnScreenOff = true
 	s.runtime.SetConfig(config)
-	if _, changed := s.Input(server.SystemEvent{Action: server.SystemScreenOff}); !changed {
+	if _, changed := s.input(server.SystemEvent{Action: server.SystemScreenOff}); !changed {
 		t.Fatal("screen off")
 	}
-	if _, changed := s.Input(server.SystemEvent{Action: server.SystemScreenOn}); !changed {
+	if _, changed := s.input(server.SystemEvent{Action: server.SystemScreenOn}); !changed {
 		t.Fatal("screen on")
 	}
 	if _, changed := tap(s, 0, 0); changed {
 		t.Fatal("unexpected unlock")
 	}
-	if _, changed := tap(s, 160, 432); !changed || s.Frame().Presents("lock", 1) {
-		t.Fatalf("unlock = changed:%t frame:%#v", changed, s.Frame())
+	if _, changed := tap(s, 160, 432); !changed || s.frame().Presents("lock", 1) {
+		t.Fatalf("unlock = changed:%t frame:%#v", changed, s.frame())
 	}
 }
 
-func tap(s *Simulator, x, y int) (server.Frame, bool) {
-	s.Input(pointer(server.PointerDown, x, y))
-	return s.Input(pointer(server.PointerUp, x, y))
+func tap(s *simulator, x, y int) (server.Frame, bool) {
+	s.input(pointer(server.PointerDown, x, y))
+	return s.input(pointer(server.PointerUp, x, y))
 }

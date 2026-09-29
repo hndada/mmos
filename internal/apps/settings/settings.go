@@ -75,6 +75,6 @@ func (a *App) show() {
 
 // Configure refreshes the labels from the server-owned configuration.
 func (a *App) Configure(config model.SystemConfig) {
-	a.Process.Configure(config)
+	a.Process.Config = config
 	a.show()
 }

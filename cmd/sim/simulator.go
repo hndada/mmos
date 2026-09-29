@@ -1,4 +1,4 @@
-package sim
+package main
 
 import (
 	"fmt"
@@ -16,8 +16,8 @@ import (
 
 const displayID = server.PrimaryDisplay
 
-// Simulator wires one display, trusted system UI, and installed applications.
-type Simulator struct {
+// simulator wires one display, trusted system UI, and installed applications.
+type simulator struct {
 	runtime         server.Runtime
 	drawer          client.Drawer
 	lock            *lock.App
@@ -33,7 +33,7 @@ type Simulator struct {
 	splash          server.Frame
 }
 
-func New() (*Simulator, error) {
+func newSimulator() (*simulator, error) {
 	runtime := server.NewRuntime(
 		&server.AppPackage{ID: "home", EntryPoint: "Home.Main"},
 		&server.AppPackage{ID: "chat-app", EntryPoint: "Chat.Main"},
@@ -43,8 +43,8 @@ func New() (*Simulator, error) {
 	if err != nil {
 		return nil, fmt.Errorf("launch home: %w", err)
 	}
-	s := &Simulator{runtime: runtime, homeSession: homeLaunch.Session}
-	s.homeApp = home.New(homeLaunch.Package, inProcessLauncher{simulator: s})
+	s := &simulator{runtime: runtime, homeSession: homeLaunch.Session}
+	s.homeApp = home.New(homeLaunch.Package, inProcessLauncher{sim: s})
 	s.applyConfig(runtime.Config())
 	locks, err := lock.New(&s.runtime, displayID)
 	if err != nil {
@@ -78,7 +78,7 @@ func New() (*Simulator, error) {
 	return s, nil
 }
 
-func (s *Simulator) Terminate(pid int) server.Frame {
+func (s *simulator) terminate(pid int) server.Frame {
 	if pid == s.homeSession.PID() || !s.runtime.Terminate(pid) {
 		return s.runtime.LastFrame(displayID)
 	}
@@ -90,6 +90,6 @@ func (s *Simulator) Terminate(pid int) server.Frame {
 	}
 	return s.activateHome()
 }
-func (s *Simulator) Frame() server.Frame         { return s.runtime.LastFrame(displayID) }
-func (s *Simulator) SplashFrame() server.Frame   { return s.splash }
-func (s *Simulator) Foreground() server.WindowID { return s.runtime.Foreground(displayID) }
+func (s *simulator) frame() server.Frame         { return s.runtime.LastFrame(displayID) }
+func (s *simulator) splashFrame() server.Frame   { return s.splash }
+func (s *simulator) foreground() server.WindowID { return s.runtime.Foreground(displayID) }
